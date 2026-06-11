@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marathon Car Rental — RAW Operations Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #060810;
+  --s1: #0c0f18;
+  --s2: #111520;
+  --s3: #181c2a;
+  --border: #1c2035;
+  --border2: #232840;
+  --gold: #e8c547;
+  --gold-dim: rgba(232,197,71,0.08);
+  --gold-glow: rgba(232,197,71,0.18);
+  --gold-bright: #f2d668;
+  --teal: #4fd1c5;
+  --teal-dim: rgba(79,209,197,0.08);
+  --red: #f87171;
+  --red-dim: rgba(248,113,113,0.1);
+  --blue: #60a5fa;
+  --blue-dim: rgba(96,165,250,0.1);
+  --purple: #a78bfa;
+  --green: #34d399;
+  --green-dim: rgba(52,211,153,0.1);
+  --text: #dde3ef;
+  --muted: #4e5878;
+  --muted2: #323853;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+
+/* ─── SCROLLBAR ─── */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--s1);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:var(--gold);}
+
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'DM Mono',monospace;
+  font-size:13px;
+  min-height:100vh;
+  position:relative;
+}
+
+/* ─── DOT GRID ─── */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:radial-gradient(circle,rgba(255,255,255,0.025) 1px,transparent 1px);
+  background-size:26px 26px;
+  pointer-events:none;z-index:0;
+}
+
+/* ─── SCAN LINE ─── */
+body::after{
+  content:'';
+  position:fixed;inset:0;
+  background:repeating-linear-gradient(
+    0deg,
+    transparent,transparent 2px,
+    rgba(0,0,0,0.06) 2px,rgba(0,0,0,0.06) 3px
+  );
+  pointer-events:none;z-index:0;
+}
+
+/* ─── NAV ─── */
+.topbar{
+  position:sticky;top:0;z-index:100;
+  background:rgba(6,8,16,0.95);
+  backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  box-shadow:0 1px 32px rgba(0,0,0,0.5);
+  display:flex;align-items:center;
+  padding:0 40px;height:56px;gap:0;
+}
+
+.brand{
+  font-family:'Syne',sans-serif;
+  font-size:15px;font-weight:800;
+  color:var(--gold);
+  letter-spacing:-0.3px;
+  margin-right:40px;
+  white-space:nowrap;
+  text-shadow:0 0 24px rgba(232,197,71,0.35);
+}
+.brand span{color:var(--text);font-weight:700;text-shadow:none;}
+
+/* LIVE indicator */
+.live-chip{
+  display:flex;align-items:center;gap:6px;
+  margin-right:20px;
+  background:rgba(52,211,153,0.07);
+  border:1px solid rgba(52,211,153,0.18);
+  border-radius:20px;padding:3px 9px;
+}
+.live-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--green);
+  animation:pulse-live 2.2s ease-in-out infinite;
+  flex-shrink:0;
+}
+@keyframes pulse-live{
+  0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(52,211,153,0.5);}
+  50%{opacity:0.7;box-shadow:0 0 0 5px rgba(52,211,153,0);}
+}
+.live-text{font-size:9px;color:var(--green);letter-spacing:0.15em;text-transform:uppercase;}
+
+.tabs{display:flex;gap:0;flex:1;}
+
+.tab-btn{
+  background:none;border:none;
+  color:var(--muted);
+  font-family:'DM Mono',monospace;
+  font-size:11px;letter-spacing:0.1em;
+  text-transform:uppercase;
+  padding:0 20px;height:56px;
+  cursor:pointer;
+  border-bottom:2px solid transparent;
+  transition:color 0.15s,border-color 0.15s,text-shadow 0.15s;
+  white-space:nowrap;
+}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{
+  color:var(--gold);
+  border-bottom-color:var(--gold);
+  text-shadow:0 0 16px rgba(232,197,71,0.4);
+}
+
+.topbar-meta{
+  font-size:10px;color:var(--muted);
+  text-align:right;line-height:1.7;
+  margin-left:auto;
+}
+.topbar-meta span{color:var(--text);}
+
+/* ─── PANELS ─── */
+.panel{display:none;animation:fadeIn 0.28s ease;position:relative;z-index:1;}
+.panel.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+/* ─── OVERVIEW ─── */
+.overview{padding:40px 40px 60px;}
+
+.ov-hero{
+  display:grid;
+  grid-template-columns:1fr 320px;
+  gap:24px;
+  margin-bottom:28px;
+  align-items:start;
+}
+
+.ov-headline{
+  font-family:'Syne',sans-serif;
+  font-size:clamp(32px,4vw,52px);
+  font-weight:800;
+  line-height:1.0;
+  color:#fff;
+  letter-spacing:-1.5px;
+}
+.ov-headline em{
+  font-style:normal;
+  background:linear-gradient(135deg,var(--gold-bright),var(--gold));
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  display:block;
+  filter:drop-shadow(0 0 20px rgba(232,197,71,0.3));
+}
+
+.ov-sub{
+  font-size:11px;color:var(--muted);
+  margin-top:12px;letter-spacing:0.08em;
+  text-transform:uppercase;
+}
+
+/* Revenue highlight */
+.rev-highlight{
+  background:linear-gradient(135deg,var(--s2) 0%,rgba(232,197,71,0.05) 100%);
+  border:1px solid rgba(232,197,71,0.15);
+  border-radius:14px;
+  padding:24px 28px;
+  display:flex;align-items:center;gap:32px;
+  margin-top:28px;
+  box-shadow:0 4px 40px rgba(0,0,0,0.4),inset 0 1px 0 rgba(232,197,71,0.08);
+  position:relative;overflow:hidden;
+}
+.rev-highlight::before{
+  content:'';position:absolute;
+  top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(232,197,71,0.3),transparent);
+}
+
+.rh-main{flex:1;}
+.rh-num{
+  font-family:'Syne',sans-serif;
+  font-size:42px;font-weight:800;
+  background:linear-gradient(135deg,var(--gold-bright),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:-1px;line-height:1;
+  filter:drop-shadow(0 0 16px rgba(232,197,71,0.35));
+}
+.rh-lbl{font-size:11px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:0.1em;}
+
+.rh-divider{width:1px;height:60px;background:var(--border2);}
+
+.rh-side{text-align:center;}
+.rh-s-num{
+  font-family:'Syne',sans-serif;
+  font-size:22px;font-weight:800;color:var(--text);
+}
+.rh-s-lbl{font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.08em;}
+
+/* Utilization gauge */
+.gauge-wrap{
+  background:linear-gradient(160deg,var(--s1),var(--s2));
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:28px 24px 20px;
+  text-align:center;
+  box-shadow:0 8px 40px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+.gauge-label{
+  font-size:10px;text-transform:uppercase;
+  letter-spacing:0.12em;color:var(--muted);
+  margin-bottom:16px;
+}
+
+.gauge-svg-wrap{position:relative;display:inline-block;}
+
+.gauge-pct-label{
+  position:absolute;
+  bottom:14px;left:50%;transform:translateX(-50%);
+  font-family:'Syne',sans-serif;
+  font-size:30px;font-weight:800;
+  background:linear-gradient(135deg,var(--gold-bright),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  white-space:nowrap;
+  filter:drop-shadow(0 0 12px rgba(232,197,71,0.4));
+}
+
+.gauge-sub-label{
+  font-size:10px;color:var(--muted);
+  margin-top:6px;
+  text-transform:uppercase;letter-spacing:0.1em;
+}
+
+.gauge-breakdown{
+  display:flex;gap:16px;justify-content:center;
+  margin-top:14px;
+}
+.gb-item{text-align:center;}
+.gb-num{font-size:18px;font-weight:500;}
+.gb-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;}
+
+/* KPI grid */
+.kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:12px;
+  margin-bottom:28px;
+}
+
+.kpi{
+  background:linear-gradient(160deg,var(--s1),var(--s2));
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:18px 16px 14px;
+  position:relative;overflow:hidden;
+  transition:border-color 0.2s,transform 0.2s,box-shadow 0.2s;
+  cursor:default;
+}
+.kpi:hover{
+  border-color:var(--kc,var(--gold));
+  transform:translateY(-3px);
+  box-shadow:0 8px 32px rgba(0,0,0,0.5),0 0 16px rgba(0,0,0,0.3);
+}
+.kpi::after{
+  content:'';position:absolute;
+  bottom:0;left:0;right:0;height:2px;
+  background:var(--kc,var(--gold));
+  opacity:0.6;
+  transition:opacity 0.2s;
+}
+.kpi:hover::after{opacity:1;}
+.kpi::before{
+  content:'';position:absolute;
+  top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--kc,var(--gold)),transparent);
+  opacity:0.2;
+}
+
+.kpi-n{
+  font-family:'Syne',sans-serif;
+  font-size:26px;font-weight:800;
+  color:var(--kc,var(--gold));
+  line-height:1;letter-spacing:-0.5px;
+  text-shadow:0 0 20px color-mix(in srgb,var(--kc,var(--gold)) 50%,transparent);
+}
+.kpi-l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.09em;margin-top:5px;}
+.kpi-s{font-size:10px;color:var(--muted2);margin-top:3px;}
+
+/* Charts row */
+.charts-row{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:20px;
+  margin-bottom:28px;
+}
+
+.chart-card{
+  background:linear-gradient(160deg,var(--s1),var(--s2));
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:24px;
+  box-shadow:0 4px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.02);
+  transition:border-color 0.2s,box-shadow 0.2s;
+}
+.chart-card:hover{
+  border-color:var(--border2);
+  box-shadow:0 8px 48px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+.cc-title{
+  font-size:10px;text-transform:uppercase;
+  letter-spacing:0.14em;color:var(--gold);
+  margin-bottom:20px;
+  text-shadow:0 0 12px rgba(232,197,71,0.3);
+}
+
+/* Horizontal bars */
+.hbar-list{display:flex;flex-direction:column;gap:10px;}
+.hbar-row{display:flex;align-items:center;gap:10px;}
+.hbar-lbl{font-size:10px;color:var(--text);width:40px;flex-shrink:0;}
+.hbar-track{
+  flex:1;height:22px;
+  background:var(--s3);border-radius:3px;
+  overflow:hidden;position:relative;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,0.5);
+}
+.hbar-fill{
+  height:100%;border-radius:3px;
+  width:0;
+  transition:width 1.1s cubic-bezier(0.16,1,0.3,1);
+  display:flex;align-items:center;
+  padding-right:6px;justify-content:flex-end;
+  position:relative;
+}
+.hbar-fill::after{
+  content:'';
+  position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent 60%,rgba(255,255,255,0.08));
+  border-radius:3px;
+}
+.hbar-fill-lbl{font-size:9px;color:rgba(0,0,0,0.7);font-weight:500;white-space:nowrap;position:relative;z-index:1;}
+.hbar-cnt{font-size:11px;color:var(--muted);width:24px;text-align:right;flex-shrink:0;}
+
+/* Revenue bars */
+.rev-bars{display:flex;flex-direction:column;gap:8px;}
+.rev-row{display:flex;align-items:center;gap:8px;}
+.rev-lbl{font-size:10px;color:var(--muted);width:32px;flex-shrink:0;}
+.rev-track{
+  flex:1;height:26px;background:var(--s3);
+  border-radius:3px;overflow:hidden;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,0.5);
+}
+.rev-fill{
+  height:100%;border-radius:3px;width:0;
+  transition:width 1.1s cubic-bezier(0.16,1,0.3,1) 0.2s;
+  display:flex;align-items:center;padding:0 8px;
+  position:relative;
+}
+.rev-fill::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent 50%,rgba(255,255,255,0.1));
+  border-radius:3px;
+}
+.rev-fill-lbl{font-size:10px;color:rgba(0,0,0,0.75);font-weight:500;position:relative;z-index:1;}
+.rev-amt{font-size:11px;color:var(--muted);width:70px;text-align:right;flex-shrink:0;}
+
+/* Donut */
+.donut-wrap{display:flex;flex-direction:column;align-items:center;}
+.donut-ring{position:relative;width:140px;height:140px;margin:0 auto 16px;}
+.donut-ring svg{width:140px;height:140px;}
+.donut-center-txt{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  text-align:center;
+}
+.dcn{
+  font-family:'Syne',sans-serif;font-size:22px;font-weight:800;
+  background:linear-gradient(135deg,var(--gold-bright),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.dcl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;}
+.donut-legend{width:100%;display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+.dl-row{display:flex;align-items:center;gap:7px;font-size:11px;}
+.dl-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.dl-name{flex:1;color:var(--text);}
+.dl-val{color:var(--muted);font-size:10px;}
+
+/* Agent comparison */
+.agent-grid{display:flex;flex-direction:column;gap:8px;margin-top:4px;}
+.agent-row{
+  background:var(--s3);border-radius:8px;padding:12px 14px;
+  border:1px solid var(--border);
+  transition:border-color 0.15s,background 0.15s;
+}
+.agent-row:hover{border-color:var(--border2);background:var(--s2);}
+.agent-name{font-size:11px;color:var(--text);margin-bottom:8px;}
+.agent-stats{display:flex;gap:16px;}
+.ast{text-align:center;}
+.ast-n{
+  font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--gold);
+  text-shadow:0 0 12px rgba(232,197,71,0.3);
+}
+.ast-l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;}
+
+/* ─── FLEET TABLE ─── */
+.fleet-section{padding:0 40px 60px;position:relative;z-index:1;}
+
+.fleet-controls{
+  padding:20px 0 16px;
+  display:flex;gap:10px;flex-wrap:wrap;
+  align-items:center;
+  border-bottom:1px solid var(--border);
+  position:sticky;top:56px;z-index:10;
+  background:var(--bg);
+}
+
+.fl-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;}
+
+input[type=text]{
+  background:var(--s1);border:1px solid var(--border);
+  color:var(--text);padding:7px 12px;
+  border-radius:6px;font-family:'DM Mono',monospace;
+  font-size:12px;width:200px;outline:none;
+  transition:border-color 0.2s,box-shadow 0.2s;
+}
+input[type=text]:focus{
+  border-color:var(--gold);
+  box-shadow:0 0 0 2px rgba(232,197,71,0.1);
+}
+input[type=text]::placeholder{color:var(--muted2);}
+
+select{
+  background:var(--s1);border:1px solid var(--border);
+  color:var(--text);padding:7px 12px;
+  border-radius:6px;font-family:'DM Mono',monospace;
+  font-size:12px;outline:none;cursor:pointer;
+  transition:border-color 0.2s;
+}
+select:focus{border-color:var(--gold);}
+
+.cnt-badge{
+  margin-left:auto;
+  background:var(--gold-dim);color:var(--gold);
+  font-size:10px;padding:4px 10px;
+  border-radius:20px;border:1px solid var(--gold-glow);
+}
+
+.table-wrap{overflow-x:auto;}
+
+table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;}
+
+thead tr{border-bottom:1px solid var(--gold);}
+
+th{
+  font-size:9px;text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--gold);padding:10px 10px;
+  text-align:left;white-space:nowrap;cursor:pointer;
+  user-select:none;background:var(--bg);
+  position:sticky;top:calc(56px + 57px);z-index:5;
+  transition:color 0.15s;
+}
+th:hover{color:#fff;}
+th.sorted{color:#fff;}
+th .sort-arrow{opacity:0.3;margin-left:3px;}
+th.sorted .sort-arrow{opacity:1;color:var(--gold);}
+
+tbody tr{
+  border-bottom:1px solid var(--border);
+  transition:background 0.1s;
+}
+tbody tr.on-rent{
+  background:rgba(79,209,197,0.025);
+  border-left:2px solid rgba(79,209,197,0.35);
+}
+tbody tr.on-rent td:first-child{padding-left:8px;}
+tbody tr:hover{background:rgba(255,255,255,0.025);}
+
+td{padding:8px 10px;white-space:nowrap;}
+
+td.unit-cell{
+  font-family:'Syne',sans-serif;
+  font-size:13px;font-weight:800;
+  color:var(--gold);
+  text-shadow:0 0 10px rgba(232,197,71,0.25);
+}
+
+.badge{
+  display:inline-block;padding:2px 7px;
+  border-radius:4px;font-size:9px;font-weight:500;
+  letter-spacing:0.05em;text-transform:uppercase;
+}
+.b-ccar{background:rgba(96,165,250,0.1);color:#93c5fd;border:1px solid rgba(96,165,250,0.2);}
+.b-icar{background:rgba(167,139,250,0.1);color:#c4b5fd;border:1px solid rgba(167,139,250,0.2);}
+.b-fcar{background:rgba(52,211,153,0.1);color:#6ee7b7;border:1px solid rgba(52,211,153,0.2);}
+.b-xfar{background:rgba(251,146,60,0.1);color:#fdba74;border:1px solid rgba(251,146,60,0.2);}
+.b-ecar{background:rgba(244,114,182,0.1);color:#f9a8d4;border:1px solid rgba(244,114,182,0.2);}
+.b-hbrd{background:rgba(45,212,191,0.1);color:#5eead4;border:1px solid rgba(45,212,191,0.2);}
+.b-lcar{background:rgba(248,113,113,0.1);color:#fca5a5;border:1px solid rgba(248,113,113,0.2);}
+.b-mvan{background:rgba(234,179,8,0.1);color:#fde047;border:1px solid rgba(234,179,8,0.2);}
+
+.status-avail{color:var(--green);font-size:11px;}
+.status-rent{color:var(--teal);font-size:11px;display:inline-flex;align-items:center;gap:5px;}
+.status-rent-unknown{color:var(--muted);font-size:11px;}
+
+/* Pulsing dot for on-rent */
+.rent-pulse{
+  display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--teal);flex-shrink:0;
+  animation:pulse-teal 2s ease-in-out infinite;
+}
+@keyframes pulse-teal{
+  0%,100%{box-shadow:0 0 0 0 rgba(79,209,197,0.5);}
+  50%{box-shadow:0 0 0 4px rgba(79,209,197,0);}
+}
+
+.cdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle;box-shadow:0 0 4px rgba(0,0,0,0.5);}
+
+.mi{font-size:11px;color:var(--muted);}
+.pl{font-size:11px;}
+
+.rate-cell{font-size:11px;color:var(--gold);}
+.rate-type-mo{color:var(--gold);}
+.rate-type-wk{color:var(--teal);}
+.rate-type-day{color:var(--red);}
+
+.no-res{text-align:center;padding:60px;color:var(--muted);font-size:12px;}
+
+/* ─── AGREEMENTS ─── */
+.agr-section{padding:40px 40px 60px;position:relative;z-index:1;}
+
+.agr-summary{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:14px;margin-bottom:28px;
+}
+
+.agr-kpi{
+  background:linear-gradient(160deg,var(--s1),var(--s2));
+  border:1px solid var(--border);
+  border-radius:12px;padding:16px 18px;
+  transition:border-color 0.2s,transform 0.2s;
+}
+.agr-kpi:hover{border-color:var(--border2);transform:translateY(-2px);}
+.agr-kpi-n{
+  font-family:'Syne',sans-serif;
+  font-size:24px;font-weight:800;
+  background:linear-gradient(135deg,var(--gold-bright),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  line-height:1;
+}
+.agr-kpi-l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.09em;margin-top:5px;}
+
+.agr-type-cards{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:14px;margin-bottom:28px;
+}
+
+.atc{
+  background:linear-gradient(160deg,var(--s1),var(--s2));
+  border:1px solid var(--border);
+  border-radius:12px;padding:18px 20px;
+  border-left:3px solid var(--atc-color);
+  box-shadow:0 4px 24px rgba(0,0,0,0.35);
+  transition:box-shadow 0.2s,transform 0.2s;
+}
+.atc:hover{box-shadow:0 8px 40px rgba(0,0,0,0.5);transform:translateY(-2px);}
+
+.atc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.atc-name{font-size:12px;color:var(--atc-color);font-weight:500;}
+.atc-count{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--text);}
+
+.atc-row{
+  display:flex;justify-content:space-between;
+  font-size:11px;padding:4px 0;
+  border-top:1px solid var(--border);
+}
+.atc-row .lbl{color:var(--muted);}
+
+.agr-table-wrap{overflow-x:auto;}
+
+.agr-table{width:100%;border-collapse:collapse;font-size:12px;}
+.agr-table thead tr{border-bottom:1px solid var(--gold);}
+.agr-table th{
+  font-size:9px;text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--gold);padding:10px 10px;text-align:left;white-space:nowrap;
+  text-shadow:0 0 10px rgba(232,197,71,0.25);
+}
+.agr-table th.r{text-align:right;}
+.agr-table tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+.agr-table tbody tr:hover{background:var(--s1);}
+.agr-table td{padding:9px 10px;}
+.agr-table td.r{text-align:right;}
+.agr-table td.ra-n{color:var(--muted);font-size:11px;}
+.agr-table td.nm{font-weight:500;}
+.agr-table td.rate-v{font-weight:500;}
+.agr-table td.wk-eq{color:var(--teal);font-size:11px;}
+.agr-table td.mo-eq{color:var(--gold);font-size:11px;}
+.agr-table tfoot tr{border-top:2px solid var(--gold);background:var(--s1);}
+.agr-table tfoot td{
+  padding:11px 10px;
+  font-family:'Syne',sans-serif;
+  font-size:13px;font-weight:800;color:var(--gold);
+  text-shadow:0 0 12px rgba(232,197,71,0.3);
+}
+.agr-table tfoot td.r{text-align:right;}
+.agr-table td.zero{color:var(--muted);}
+
+.badge-mo{background:rgba(232,197,71,0.1);color:var(--gold);border:1px solid rgba(232,197,71,0.2);}
+.badge-wk{background:rgba(79,209,197,0.1);color:var(--teal);border:1px solid rgba(79,209,197,0.2);}
+.badge-day{background:rgba(248,113,113,0.1);color:var(--red);border:1px solid rgba(248,113,113,0.2);}
+.badge-zero{background:rgba(90,99,128,0.1);color:var(--muted);border:1px solid var(--border);}
+
+@media(max-width:900px){
+  .topbar{padding:0 16px;}
+  .overview,.fleet-section,.agr-section{padding-left:16px;padding-right:16px;}
+  .ov-hero{grid-template-columns:1fr;}
+  .kpi-grid{grid-template-columns:repeat(3,1fr);}
+  .charts-row{grid-template-columns:1fr;}
+  .agr-summary{grid-template-columns:repeat(3,1fr);}
+  .agr-type-cards{grid-template-columns:1fr;}
+  .rev-highlight{flex-wrap:wrap;gap:16px;}
+  .rh-divider{display:none;}
+  .live-chip{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- ─── TOP NAV ─── -->
+<nav class="topbar">
+  <div class="brand">MARATHON <span>/ RAW</span></div>
+  <div class="live-chip">
+    <span class="live-dot"></span>
+    <span class="live-text">Live</span>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('overview',this)">Overview</button>
+    <button class="tab-btn" onclick="showTab('fleet',this)">Fleet</button>
+    <button class="tab-btn" onclick="showTab('agreements',this)">Agreements</button>
+  </div>
+  <div class="topbar-meta">
+    <div>Run <span>06/08/2026 01:54 PM</span></div>
+    <div>By <span>Bobby Chi</span></div>
+  </div>
+</nav>
+
+<!-- ══════════════ OVERVIEW ══════════════ -->
+<div id="tab-overview" class="panel active">
+<div class="overview">
+
+  <div class="ov-hero">
+    <div>
+      <div class="ov-headline">Fleet<em>Operations</em></div>
+      <div class="ov-sub">Location RAW &nbsp;·&nbsp; 107 units &nbsp;·&nbsp; 25 open agreements</div>
+
+      <div class="rev-highlight">
+        <div class="rh-main">
+          <div class="rh-num">$16,217</div>
+          <div class="rh-lbl">Monthly Revenue</div>
+        </div>
+        <div class="rh-divider"></div>
+        <div class="rh-side">
+          <div class="rh-s-num">$3,743</div>
+          <div class="rh-s-lbl">Per Week</div>
+        </div>
+        <div class="rh-divider"></div>
+        <div class="rh-side">
+          <div class="rh-s-num">$155.96</div>
+          <div class="rh-s-lbl">Avg / Contract / Wk</div>
+        </div>
+        <div class="rh-divider"></div>
+        <div class="rh-side">
+          <div class="rh-s-num">24</div>
+          <div class="rh-s-lbl">Active Contracts</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gauge -->
+    <div class="gauge-wrap">
+      <div class="gauge-label">Fleet Utilization</div>
+      <div class="gauge-svg-wrap">
+        <svg id="gaugeSvg" width="220" height="130" viewBox="0 0 220 130"></svg>
+        <div class="gauge-pct-label" id="gaugePct">—</div>
+      </div>
+      <div class="gauge-sub-label">of fleet currently earning</div>
+      <div class="gauge-breakdown">
+        <div class="gb-item">
+          <div class="gb-num" style="color:var(--teal)" id="gbRent">—</div>
+          <div class="gb-lbl">On Rent</div>
+        </div>
+        <div class="gb-item">
+          <div class="gb-num" style="color:var(--green)" id="gbAvail">—</div>
+          <div class="gb-lbl">Available</div>
+        </div>
+        <div class="gb-item">
+          <div class="gb-num" style="color:var(--gold)" id="gbTotal">107</div>
+          <div class="gb-lbl">Total</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi" style="--kc:var(--gold)">
+      <div class="kpi-n">107</div>
+      <div class="kpi-l">Total Fleet</div>
+      <div class="kpi-s">7 classes</div>
+    </div>
+    <div class="kpi" style="--kc:var(--teal)">
+      <div class="kpi-n" id="kpiRent">—</div>
+      <div class="kpi-l">On Rent</div>
+      <div class="kpi-s">Active now</div>
+    </div>
+    <div class="kpi" style="--kc:var(--green)">
+      <div class="kpi-n" id="kpiAvail">—</div>
+      <div class="kpi-l">Available</div>
+      <div class="kpi-s">On lot</div>
+    </div>
+    <div class="kpi" style="--kc:var(--gold)">
+      <div class="kpi-n">$16,217</div>
+      <div class="kpi-l">Mo. Revenue</div>
+      <div class="kpi-s">24 contracts</div>
+    </div>
+    <div class="kpi" style="--kc:var(--purple)">
+      <div class="kpi-n">67</div>
+      <div class="kpi-l">CCAR Units</div>
+      <div class="kpi-s">62.6% of fleet</div>
+    </div>
+    <div class="kpi" style="--kc:var(--red)">
+      <div class="kpi-n">$229</div>
+      <div class="kpi-l">Top Daily Rate</div>
+      <div class="kpi-s">RAW-3668</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row">
+
+    <div class="chart-card">
+      <div class="cc-title">Fleet by Class</div>
+      <div class="hbar-list" id="classBarChart"></div>
+    </div>
+
+    <div class="chart-card">
+      <div class="cc-title">Revenue by Contract Type</div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;">Monthly equivalent</div>
+        <div class="rev-bars" id="revBars"></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="cc-title">Contracts by Type</div>
+      <div class="donut-wrap">
+        <div class="donut-ring">
+          <svg id="donutSvg" viewBox="0 0 140 140"></svg>
+          <div class="donut-center-txt">
+            <div class="dcn">24</div>
+            <div class="dcl">Active</div>
+          </div>
+        </div>
+        <div class="donut-legend" id="donutLeg"></div>
+      </div>
+      <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">By Agent</div>
+        <div class="agent-grid" id="agentGrid"></div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════ FLEET ══════════════ -->
+<div id="tab-fleet" class="panel">
+<div class="fleet-section">
+  <div class="fleet-controls">
+    <span class="fl-label">Filter</span>
+    <input type="text" id="flSearch" placeholder="Unit, plate, model, name…">
+    <select id="flClass">
+      <option value="">All Classes</option>
+      <option value="CCAR">CCAR</option>
+      <option value="ICAR">ICAR</option>
+      <option value="FCAR">FCAR</option>
+      <option value="XFAR">XFAR</option>
+      <option value="ECAR">ECAR</option>
+      <option value="HBRD">HBRD</option>
+      <option value="LCAR">LCAR</option>
+      <option value="MVAN">MVAN</option>
+    </select>
+    <select id="flStatus">
+      <option value="">All Statuses</option>
+      <option value="rent">On Rent</option>
+      <option value="avail">Available</option>
+    </select>
+    <select id="flColor">
+      <option value="">All Colors</option>
+      <option>WHITE</option><option>SILVER</option><option>BLACK</option>
+      <option>GREY</option><option>GRAY</option><option>BLUE</option>
+      <option>RED</option><option>GOLD</option><option>MAROON</option>
+      <option>GREEN</option><option>TAN</option><option>BURGUNDY</option>
+    </select>
+    <span class="cnt-badge" id="flCount">— vehicles</span>
+  </div>
+  <div class="table-wrap">
+    <table id="flTable">
+      <thead><tr>
+        <th onclick="flSort('unit',event)">Unit <span class="sort-arrow">↕</span></th>
+        <th onclick="flSort('cls',event)">Class <span class="sort-arrow">↕</span></th>
+        <th onclick="flSort('year',event)">Year <span class="sort-arrow">↕</span></th>
+        <th onclick="flSort('model',event)">Model <span class="sort-arrow">↕</span></th>
+        <th>Body</th>
+        <th>Plate</th>
+        <th onclick="flSort('color',event)">Color <span class="sort-arrow">↕</span></th>
+        <th onclick="flSort('mileage',event)">Mileage <span class="sort-arrow">↕</span></th>
+        <th>Status / R/A</th>
+        <th>Renter</th>
+        <th>Rate</th>
+        <th>Type</th>
+        <th>TB Date</th>
+        <th>In Service</th>
+      </tr></thead>
+      <tbody id="flBody"></tbody>
+    </table>
+    <div class="no-res" id="flNoRes" style="display:none">No vehicles match.</div>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════ AGREEMENTS ══════════════ -->
+<div id="tab-agreements" class="panel">
+<div class="agr-section">
+
+  <div class="agr-summary">
+    <div class="agr-kpi">
+      <div class="agr-kpi-n">$16,217</div>
+      <div class="agr-kpi-l">Total / Month</div>
+    </div>
+    <div class="agr-kpi">
+      <div class="agr-kpi-n">$3,743</div>
+      <div class="agr-kpi-l">Total / Week</div>
+    </div>
+    <div class="agr-kpi">
+      <div class="agr-kpi-n">$675</div>
+      <div class="agr-kpi-l">Avg / Mo. Contract</div>
+    </div>
+    <div class="agr-kpi">
+      <div class="agr-kpi-n">24</div>
+      <div class="agr-kpi-l">Active Contracts</div>
+    </div>
+    <div class="agr-kpi">
+      <div class="agr-kpi-n">1</div>
+      <div class="agr-kpi-l">$0 / Excluded</div>
+    </div>
+  </div>
+
+  <div class="agr-type-cards">
+    <div class="atc" style="--atc-color:var(--gold)">
+      <div class="atc-header">
+        <span class="atc-name">Monthly</span>
+        <span class="atc-count">15</span>
+      </div>
+      <div class="atc-row"><span class="lbl">Weekly equiv</span><span>$2,100/wk</span></div>
+      <div class="atc-row"><span class="lbl">Monthly total</span><span>$9,104/mo</span></div>
+      <div class="atc-row"><span class="lbl">Avg per contract</span><span>$607/mo</span></div>
+    </div>
+    <div class="atc" style="--atc-color:var(--teal)">
+      <div class="atc-header">
+        <span class="atc-name">Weekly</span>
+        <span class="atc-count">7</span>
+      </div>
+      <div class="atc-row"><span class="lbl">Weekly total</span><span>$1,224/wk</span></div>
+      <div class="atc-row"><span class="lbl">Monthly equiv</span><span>$5,304/mo</span></div>
+      <div class="atc-row"><span class="lbl">Avg per contract</span><span>$175/wk</span></div>
+    </div>
+    <div class="atc" style="--atc-color:var(--red)">
+      <div class="atc-header">
+        <span class="atc-name">Daily</span>
+        <span class="atc-count">2</span>
+      </div>
+      <div class="atc-row"><span class="lbl">RAW-3668 (Reese)</span><span>$229/day</span></div>
+      <div class="atc-row"><span class="lbl">RAW-3712 (Pamilton)</span><span>$39.95/day</span></div>
+      <div class="atc-row"><span class="lbl">Monthly equiv</span><span>$8,154/mo*</span></div>
+    </div>
+  </div>
+
+  <div class="agr-table-wrap">
+    <table class="agr-table">
+      <thead><tr>
+        <th>R/A #</th>
+        <th>Name</th>
+        <th>Class</th>
+        <th>Unit</th>
+        <th>Agent</th>
+        <th>Type</th>
+        <th class="r">Listed Rate</th>
+        <th class="r">Per Week</th>
+        <th class="r">Per Month</th>
+      </tr></thead>
+      <tbody id="agrBody"></tbody>
+      <tfoot><tr>
+        <td colspan="6">TOTALS — 24 Active Contracts</td>
+        <td></td>
+        <td class="r">$3,743/wk</td>
+        <td class="r">$16,217/mo</td>
+      </tr></tfoot>
+    </table>
+  </div>
+
+</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════
+
+const agreements = [
+  {ra:'RAW-3321', name:'Greenbaum, Kat',      cls:'CCAR',unit:'524', agent:'Chi, Bobby',    type:'mo', rate:495,   wk:114.22,  mo:495},
+  {ra:'RAW-3611', name:'Mindell, Earl A',     cls:'ICAR',unit:'558', agent:'Dufresne, MA',  type:'wk', rate:119,   wk:119,     mo:515.63},
+  {ra:'RAW-3633', name:'Kipper, Judith',      cls:'CCAR',unit:'537', agent:'Chi, Bobby',    type:'mo', rate:595,   wk:137.31,  mo:595},
+  {ra:'RAW-3636', name:"O'Neil, Michael",     cls:'ICAR',unit:'466', agent:'Hernandez, A',  type:'mo', rate:695,   wk:160.39,  mo:695},
+  {ra:'RAW-3668', name:'Reese, Jacob R',      cls:'CCAR',unit:'553', agent:'Chi, Bobby',    type:'day',rate:229,   wk:1603,    mo:6943},
+  {ra:'RAW-3687', name:'Zaleski, Christo',    cls:'ICAR',unit:'474', agent:'Chi, Bobby',    type:'mo', rate:695,   wk:160.39,  mo:695},
+  {ra:'RAW-3690', name:'Houchin, Tonya',      cls:'CCAR',unit:'550', agent:'Chi, Bobby',    type:'mo', rate:795,   wk:183.47,  mo:795},
+  {ra:'RAW-3709', name:'Esposito, Victor',    cls:'CCAR',unit:'504', agent:'Hernandez, A',  type:'wk', rate:189,   wk:189,     mo:818.93},
+  {ra:'RAW-3712', name:'Pamilton, Sheri',     cls:'CCAR',unit:'547', agent:'Chi, Bobby',    type:'day',rate:39.95, wk:279.65,  mo:1211.48},
+  {ra:'RAW-3742', name:'Dandridge, Cha',      cls:'XFAR',unit:'479', agent:'Chi, Bobby',    type:'mo', rate:695,   wk:160.39,  mo:695},
+  {ra:'RAW-3743', name:'Williams, Neal',      cls:'CCAR',unit:'535', agent:'Hernandez, A',  type:'wk', rate:159,   wk:159,     mo:688.87},
+  {ra:'RAW-3744', name:'Buzan, Cloe B',       cls:'CCAR',unit:'460', agent:'Hernandez, A',  type:'mo', rate:695,   wk:160.39,  mo:695},
+  {ra:'RAW-3745', name:'Taylor, Victor',      cls:'CCAR',unit:'476', agent:'Chi, Bobby',    type:'zero',rate:0,    wk:0,       mo:0},
+  {ra:'RAW-3754', name:'Dzambekov, Um',       cls:'CCAR',unit:'463', agent:'Chi, Bobby',    type:'mo', rate:695,   wk:160.39,  mo:695},
+  {ra:'RAW-3758', name:'Kuehr, Matthe',       cls:'CCAR',unit:'472', agent:'Chi, Bobby',    type:'mo', rate:895,   wk:206.55,  mo:895},
+  {ra:'RAW-3759', name:'Adamczyk, And',       cls:'ICAR',unit:'470', agent:'Chi, Bobby',    type:'mo', rate:695,   wk:160.39,  mo:695},
+  {ra:'RAW-3760', name:'Wolfson, Sandr',      cls:'ICAR',unit:'475', agent:'Chi, Bobby',    type:'mo', rate:695,   wk:160.39,  mo:695},
+  {ra:'RAW-3761', name:'Lucas, Sara A',       cls:'CCAR',unit:'468', agent:'Chi, Bobby',    type:'mo', rate:695,   wk:160.39,  mo:695},
+  {ra:'RAW-3762', name:'Torjak, Balint',      cls:'ICAR',unit:'465', agent:'Chi, Bobby',    type:'wk', rate:189,   wk:189,     mo:818.93},
+  {ra:'RAW-3763', name:'Waters, Gregor',      cls:'CCAR',unit:'91',  agent:'Hernandez, A',  type:'mo', rate:595,   wk:137.31,  mo:595},
+  {ra:'RAW-3764', name:'Koris, Jett X',       cls:'CCAR',unit:'509', agent:'Hernandez, A',  type:'wk', rate:189,   wk:189,     mo:818.93},
+  {ra:'RAW-3766', name:'Binder, Frank A',     cls:'XFAR',unit:'87',  agent:'Chi, Bobby',    type:'wk', rate:189,   wk:189,     mo:818.93},
+  {ra:'RAW-3768', name:'Bullock, Aaron',      cls:'ICAR',unit:'473', agent:'Chi, Bobby',    type:'mo', rate:695,   wk:160.39,  mo:695},
+  {ra:'RAW-3769', name:'Guerrero, Ange',      cls:'CCAR',unit:'504', agent:'Chi, Bobby',    type:'wk', rate:189,   wk:189,     mo:818.93},
+  {ra:'RAW-697',  name:'Benes, Steve',        cls:'CCAR',unit:'538', agent:'Chi, Bobby',    type:'mo', rate:218,   wk:50.31,   mo:218},
+];
+
+// Build RA lookup by unit — last agreement wins for duplicate units
+const raByUnit = {};
+agreements.forEach(a => { raByUnit[String(a.unit)] = a; });
+
+const fleet = [
+  {unit:'18',  cls:'CCAR',year:2012,model:'FORTE EX',  body:'4DR',plate:'6WOY885', color:'SILVER',mileage:141997,status:'avail',tb:'01/22/2019',inSvc:'03/31/2026'},
+  {unit:'36',  cls:'CCAR',year:2005,model:'SPECTRA',   body:'4DR',plate:'5LGS399', color:'WHITE', mileage:180000,status:'avail',tb:'01/22/2019',inSvc:'05/10/2021'},
+  {unit:'459', cls:'CCAR',year:2017,model:'FORTE EX',  body:'4DR',plate:'8UCB382', color:'GREY',  mileage:7405,  status:'avail',tb:'05/10/2021',inSvc:'03/18/2024'},
+  {unit:'460', cls:'CCAR',year:2012,model:'JUKE',      body:'4DR',plate:'6BHV269', color:'SILVER',mileage:12009, status:'rent', tb:'06/14/2021',inSvc:'03/15/2024'},
+  {unit:'461', cls:'CCAR',year:2008,model:'CIVIC',     body:'4DR',plate:'8YCT038', color:'BLACK', mileage:7256,  status:'avail',tb:'01/22/2019',inSvc:'09/14/2021'},
+  {unit:'462', cls:'CCAR',year:2011,model:'FORTE EX',  body:'2DR',plate:'8YGT038', color:'GREY',  mileage:12016, status:'avail',tb:'01/22/2019',inSvc:'05/13/2025'},
+  {unit:'463', cls:'CCAR',year:2018,model:'FORTE EX',  body:'4DR',plate:'8YGT103', color:'BLACK', mileage:8405,  status:'rent', tb:'09/10/2021',inSvc:'04/28/2026'},
+  {unit:'467', cls:'CCAR',year:2016,model:'FORTE EX',  body:'4DR',plate:'8MGQ787', color:'RED',   mileage:8405,  status:'avail',tb:'09/10/2021',inSvc:'05/26/2026'},
+  {unit:'468', cls:'CCAR',year:2015,model:'ACCENT',    body:'4DR',plate:'8YGS012', color:'BLUE',  mileage:7278,  status:'rent', tb:'09/23/2021',inSvc:'05/30/2026'},
+  {unit:'469', cls:'CCAR',year:2019,model:'FORTE EX',  body:'4DR',plate:'8YGS356', color:'SILVER',mileage:54392, status:'avail',tb:'11/05/2021',inSvc:'06/06/2026'},
+  {unit:'471', cls:'CCAR',year:2020,model:'FORTE EX',  body:'4DR',plate:'8YGT440', color:'SILVER',mileage:47000, status:'avail',tb:'12/24/2021',inSvc:'05/07/2025'},
+  {unit:'472', cls:'CCAR',year:2019,model:'FORTE EX',  body:'4DR',plate:'8YCT440', color:'SILVER',mileage:66999, status:'rent', tb:'01/22/2024',inSvc:'04/25/2026'},
+  {unit:'476', cls:'CCAR',year:2014,model:'FORTE EX',  body:'4DR',plate:'8YCT715', color:'SILVER',mileage:64815, status:'rent', tb:'01/08/2022',inSvc:''},
+  {unit:'485', cls:'CCAR',year:2014,model:'FOCUS',     body:'2DR',plate:'8PPY153', color:'WHITE', mileage:13699, status:'avail',tb:'07/19/2024',inSvc:'07/19/2024'},
+  {unit:'500', cls:'CCAR',year:2012,model:'FORTE EX',  body:'4DR',plate:'6IZY538', color:'WHITE', mileage:12581, status:'avail',tb:'01/22/2019',inSvc:'05/26/2025'},
+  {unit:'501', cls:'CCAR',year:2013,model:'FORTE EX',  body:'4DR',plate:'6VAP384', color:'WHITE', mileage:11096, status:'avail',tb:'01/22/2019',inSvc:'06/17/2024'},
+  {unit:'502', cls:'CCAR',year:2012,model:'RIO LX',    body:'4DR',plate:'7PKS565', color:'WHITE', mileage:10351, status:'rent', tb:'01/22/2019',inSvc:'05/21/2026'},
+  {unit:'503', cls:'CCAR',year:2013,model:'FORTE EX',  body:'4DR',plate:'6MYM214', color:'GREY',  mileage:11948, status:'avail',tb:'01/22/2019',inSvc:'02/09/2026'},
+  {unit:'504', cls:'CCAR',year:2012,model:'FORTE EX',  body:'4DR',plate:'6WVM214', color:'GREY',  mileage:0,     status:'rent', tb:'01/22/2019',inSvc:'12/10/2025'},
+  {unit:'505', cls:'CCAR',year:2013,model:'FORTE EX',  body:'4DR',plate:'7AOS157', color:'GREY',  mileage:12970, status:'avail',tb:'01/22/2019',inSvc:'05/30/2026'},
+  {unit:'507', cls:'CCAR',year:2013,model:'RIO LX',    body:'4DR',plate:'8BRL591', color:'GREY',  mileage:14490, status:'avail',tb:'02/29/2020',inSvc:'11/07/2024'},
+  {unit:'508', cls:'CCAR',year:2010,model:'FORTE EX',  body:'4DR',plate:'9GRY643', color:'BLACK', mileage:9325,  status:'avail',tb:'01/22/2019',inSvc:'04/24/2026'},
+  {unit:'509', cls:'CCAR',year:2012,model:'FORTE EX',  body:'4DR',plate:'7CMP001', color:'WHITE', mileage:8800,  status:'rent', tb:'01/22/2019',inSvc:'04/01/2026'},
+  {unit:'510', cls:'CCAR',year:2013,model:'FORTE EX',  body:'4DR',plate:'7CMP858', color:'BLACK', mileage:10588, status:'avail',tb:'01/22/2019',inSvc:'10/27/2025'},
+  {unit:'511', cls:'CCAR',year:2014,model:'FORTE EX',  body:'4DR',plate:'7AUP568', color:'BLACK', mileage:9974,  status:'avail',tb:'01/22/2019',inSvc:'08/01/2026'},
+  {unit:'512', cls:'CCAR',year:2007,model:'SPECTRA',   body:'4DR',plate:'6YN750',  color:'RED',   mileage:13188, status:'avail',tb:'01/22/2019',inSvc:'11/15/2022'},
+  {unit:'513', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'7LFL488', color:'MAROON',mileage:19034, status:'avail',tb:'01/22/2019',inSvc:'10/24/2024'},
+  {unit:'514', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'7DQG200', color:'MAROON',mileage:16678, status:'avail',tb:'01/22/2019',inSvc:'02/10/2025'},
+  {unit:'517', cls:'CCAR',year:2007,model:'SPECTRA',   body:'4DR',plate:'5WLW304', color:'WHITE', mileage:17564, status:'avail',tb:'01/22/2019',inSvc:'02/18/2026'},
+  {unit:'519', cls:'CCAR',year:2007,model:'SPECTRA',   body:'4DR',plate:'5YDL359', color:'WHITE', mileage:20998, status:'avail',tb:'01/22/2019',inSvc:'11/18/2023'},
+  {unit:'520', cls:'CCAR',year:2008,model:'SPECTRA',   body:'4DR',plate:'6EDJ941', color:'SILVER',mileage:21541, status:'avail',tb:'01/22/2019',inSvc:'09/24/2025'},
+  {unit:'521', cls:'CCAR',year:2007,model:'SPECTRA',   body:'4DR',plate:'6DQA632', color:'BLUE',  mileage:20729, status:'avail',tb:'01/22/2019',inSvc:'09/24/2025'},
+  {unit:'522', cls:'CCAR',year:2008,model:'SPECTRA',   body:'4DR',plate:'',        color:'',      mileage:0,     status:'avail',tb:'01/22/2019',inSvc:''},
+  {unit:'523', cls:'CCAR',year:2012,model:'SPECTRA',   body:'4DR',plate:'7PKL343', color:'SILVER',mileage:13609, status:'avail',tb:'05/07/2019',inSvc:'05/15/2026'},
+  {unit:'524', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'6QGR105', color:'WHITE', mileage:20177, status:'rent', tb:'01/22/2019',inSvc:'04/19/2025'},
+  {unit:'526', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'6VPP134', color:'RED',   mileage:20069, status:'avail',tb:'01/22/2019',inSvc:'04/10/2025'},
+  {unit:'527', cls:'CCAR',year:2007,model:'SPECTRA',   body:'4DR',plate:'5YEB341', color:'SILVER',mileage:18500, status:'avail',tb:'01/22/2019',inSvc:'11/30/2024'},
+  {unit:'528', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'6HTL048', color:'BLACK', mileage:15909, status:'avail',tb:'01/22/2019',inSvc:'09/08/2026'},
+  {unit:'529', cls:'CCAR',year:2007,model:'SPECTRA',   body:'4DR',plate:'6ARU739', color:'RED',   mileage:16666, status:'avail',tb:'01/22/2019',inSvc:'11/11/2025'},
+  {unit:'530', cls:'CCAR',year:2007,model:'SPECTRA',   body:'4DR',plate:'5ZET013', color:'BLACK', mileage:12699, status:'avail',tb:'01/22/2019',inSvc:'11/11/2025'},
+  {unit:'532', cls:'CCAR',year:2008,model:'SPECTRA',   body:'4DR',plate:'7KGA494', color:'BLACK', mileage:16239, status:'avail',tb:'01/22/2019',inSvc:'05/06/2026'},
+  {unit:'533', cls:'CCAR',year:2008,model:'SPECTRA',   body:'4DR',plate:'7KGA495', color:'BLACK', mileage:16239, status:'avail',tb:'01/22/2019',inSvc:'05/16/2026'},
+  {unit:'534', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'7LFL452', color:'SILVER',mileage:16078, status:'avail',tb:'01/22/2019',inSvc:'06/19/2025'},
+  {unit:'535', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'6EDR972', color:'WHITE', mileage:20311, status:'rent', tb:'01/22/2019',inSvc:'04/11/2026'},
+  {unit:'537', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'7LFL463', color:'WHITE', mileage:7777,  status:'rent', tb:'01/22/2019',inSvc:'12/17/2025'},
+  {unit:'538', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'7LFL809', color:'GOLD',  mileage:15109, status:'rent', tb:'01/22/2019',inSvc:'11/06/2025'},
+  {unit:'539', cls:'CCAR',year:2008,model:'SPECTRA',   body:'4DR',plate:'7NJT236', color:'BLUE',  mileage:18708, status:'avail',tb:'01/22/2019',inSvc:'06/01/2026'},
+  {unit:'540', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'7LFM628', color:'SILVER',mileage:15279, status:'avail',tb:'01/22/2019',inSvc:'04/12/2026'},
+  {unit:'541', cls:'CCAR',year:2007,model:'SPECTRA',   body:'4DR',plate:'6DKD236', color:'BLACK', mileage:19164, status:'avail',tb:'01/22/2019',inSvc:'08/13/2023'},
+  {unit:'545', cls:'CCAR',year:2008,model:'SPECTRA',   body:'4DR',plate:'6WOO275', color:'BLACK', mileage:19720, status:'avail',tb:'01/10/2019',inSvc:''},
+  {unit:'546', cls:'CCAR',year:2007,model:'SPECTRA',   body:'4DR',plate:'7MEA415', color:'BLACK', mileage:11684, status:'avail',tb:'01/22/2019',inSvc:'11/19/2023'},
+  {unit:'547', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'7MEN253', color:'GRAY',  mileage:13850, status:'rent', tb:'01/22/2019',inSvc:'05/01/2026'},
+  {unit:'549', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'8BLE562', color:'BURGUNDY',mileage:16679,status:'avail',tb:'01/22/2019',inSvc:'02/02/2026'},
+  {unit:'550', cls:'CCAR',year:2008,model:'SPECTRA',   body:'4DR',plate:'8FZM816', color:'BLACK', mileage:18129, status:'rent', tb:'01/22/2019',inSvc:'02/02/2026'},
+  {unit:'552', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'7RBKX541',color:'WHITE', mileage:10332, status:'avail',tb:'01/22/2019',inSvc:'03/25/2022'},
+  {unit:'553', cls:'CCAR',year:2008,model:'SPECTRA',   body:'4DR',plate:'7RTBX527',color:'BLUE',  mileage:15142, status:'rent', tb:'01/22/2019',inSvc:'02/07/2026'},
+  {unit:'555', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'8FZM817', color:'SILVER',mileage:18000, status:'avail',tb:'06/25/2019',inSvc:'04/28/2026'},
+  {unit:'556', cls:'CCAR',year:2009,model:'SPECTRA',   body:'4DR',plate:'8KBL024', color:'SILVER',mileage:15618, status:'avail',tb:'01/22/2019',inSvc:'06/01/2026'},
+  {unit:'560', cls:'CCAR',year:2007,model:'SPECTRA',   body:'4DR',plate:'8FZM743', color:'TAN',   mileage:10431, status:'avail',tb:'08/01/2019',inSvc:'06/01/2026'},
+  {unit:'561', cls:'CCAR',year:2007,model:'SPECTRA',   body:'4DR',plate:'8KBM059', color:'RED',   mileage:19046, status:'avail',tb:'08/01/2019',inSvc:'04/28/2026'},
+  {unit:'563', cls:'CCAR',year:2008,model:'SPECTRA',   body:'4DR',plate:'8KBM691', color:'BLACK', mileage:10305, status:'avail',tb:'01/22/2019',inSvc:'04/24/2026'},
+  {unit:'611', cls:'CCAR',year:2000,model:'CIVIC',     body:'4DR',plate:'4KBL978', color:'GREEN', mileage:30618, status:'avail',tb:'01/22/2019',inSvc:'08/16/2020'},
+  {unit:'621', cls:'CCAR',year:1993,model:'SUNFIRE',   body:'4DR',plate:'4WUP350', color:'BLUE',  mileage:17913, status:'avail',tb:'01/22/2019',inSvc:'12/08/2020'},
+  {unit:'75',  cls:'CCAR',year:2007,model:'SPECTRA',   body:'4DR',plate:'8MGG322', color:'WHITE', mileage:17910, status:'avail',tb:'01/22/2019',inSvc:'12/08/2020'},
+  {unit:'77',  cls:'CCAR',year:2008,model:'ACCENT',    body:'4DR',plate:'6ARY473', color:'WHITE', mileage:14999, status:'avail',tb:'01/22/2019',inSvc:'01/22/2019'},
+  {unit:'78',  cls:'CCAR',year:2007,model:'SPECTRA',   body:'4DR',plate:'5ZCTS354',color:'WHITE', mileage:20642, status:'avail',tb:'01/22/2019',inSvc:'04/02/2026'},
+  {unit:'91',  cls:'CCAR',year:2011,model:'FIESTA',    body:'4DR',plate:'7CIR669', color:'BLACK', mileage:8794,  status:'rent', tb:'08/29/2023',inSvc:'04/02/2026'},
+  {unit:'61',  cls:'ECAR',year:2000,model:'ECHO',      body:'4DR',plate:'3NHH496', color:'WHITE', mileage:17333, status:'avail',tb:'01/22/2019',inSvc:''},
+  {unit:'19',  cls:'ECAR',year:1995,model:'CAMRY',     body:'4DR',plate:'',        color:'',      mileage:21980, status:'avail',tb:'01/22/2019',inSvc:''},
+  {unit:'480', cls:'XFAR',year:2005,model:'MURANO',    body:'SUV',plate:'9KJN832', color:'SILVER',mileage:171354,status:'avail',tb:'07/24/2024',inSvc:'07/08/2024'},
+  {unit:'481', cls:'XFAR',year:2011,model:'TRAVERSE',  body:'SUV',plate:'6ULP946', color:'GRAY',  mileage:101568,status:'avail',tb:'10/20/2022',inSvc:'12/20/2022'},
+  {unit:'482', cls:'XFAR',year:2012,model:'TRAVERSE',  body:'4DR',plate:'6WNH896', color:'SILVER',mileage:82660, status:'avail',tb:'02/01/2023',inSvc:'02/01/2023'},
+  {unit:'562', cls:'XFAR',year:2009,model:'FORESTER',  body:'4DR',plate:'8MGJ786', color:'RED',   mileage:21525, status:'avail',tb:'12/01/2021',inSvc:'04/01/2026'},
+  {unit:'60',  cls:'XFAR',year:2008,model:'ECHO SPORT',body:'4DR',plate:'8BUE725', color:'BLUE',  mileage:13399, status:'avail',tb:'01/22/2019',inSvc:''},
+  {unit:'456', cls:'XFAR',year:2006,model:'EXPLORER',  body:'SUV',plate:'7CB928',  color:'WHITE', mileage:19280, status:'avail',tb:'02/10/2019',inSvc:'10/28/2026'},
+  {unit:'457x',cls:'XFAR',year:2006,model:'ESCAPE',    body:'SUV',plate:'8FZL010', color:'GRAY',  mileage:22770, status:'avail',tb:'02/10/2019',inSvc:'09/11/2024'},
+  {unit:'479', cls:'XFAR',year:2013,model:'ESCAPE',    body:'SUV',plate:'6ZCU694', color:'WHITE', mileage:13040, status:'rent', tb:'',          inSvc:''},
+  {unit:'87',  cls:'XFAR',year:2002,model:'ALTIMA',    body:'4DR',plate:'N645171', color:'SILVER',mileage:21152, status:'rent', tb:'09/15/2019',inSvc:'11/04/2025'},
+  {unit:'457', cls:'FCAR',year:2010,model:'ES 350',    body:'4DR',plate:'6KAU670', color:'GRAY',  mileage:23117, status:'avail',tb:'07/02/2025',inSvc:'09/11/2026'},
+  {unit:'620', cls:'FCAR',year:2008,model:'CAMRY',     body:'4DR',plate:'8KBM100', color:'WHITE', mileage:16000, status:'avail',tb:'01/22/2025',inSvc:''},
+  {unit:'86',  cls:'FCAR',year:2010,model:'ALTIMA',    body:'4DR',plate:'7HEIE185',color:'GREEN', mileage:21117, status:'avail',tb:'02/27/2025',inSvc:'09/27/2025'},
+  {unit:'876', cls:'FCAR',year:2009,model:'CENTURY',   body:'4DR',plate:'2LKY283', color:'GREY',  mileage:18741, status:'avail',tb:'07/09/2018',inSvc:'09/11/2024'},
+  {unit:'885', cls:'FCAR',year:1988,model:'BONNEVILLE',body:'4DR',plate:'9FBC083', color:'BLUE',  mileage:22299, status:'avail',tb:'',          inSvc:''},
+  {unit:'89',  cls:'FCAR',year:1995,model:'ACCORD',    body:'4DR',plate:'7TCYW216',color:'SILVER',mileage:19120, status:'avail',tb:'03/02/2025',inSvc:'12/22/2025'},
+  {unit:'90',  cls:'FCAR',year:2006,model:'ACCORD',    body:'4DR',plate:'8ZAW220', color:'SILVER',mileage:15555, status:'avail',tb:'02/29/2023',inSvc:''},
+  {unit:'613', cls:'HBRD',year:2017,model:'PRIUS V',   body:'HTCHBK',plate:'WHZ543',color:'GRAY', mileage:90665, status:'avail',tb:'10/29/2020',inSvc:'08/11/2025'},
+  {unit:'21',  cls:'ICAR',year:2002,model:'ELANTRA',   body:'4DR',plate:'SKW768',  color:'SILVER',mileage:19333, status:'avail',tb:'01/22/2019',inSvc:'07/10/2026'},
+  {unit:'464', cls:'ICAR',year:2019,model:'ELANTRA',   body:'4DR',plate:'8YGS011', color:'SILVER',mileage:68288, status:'avail',tb:'01/22/2019',inSvc:''},
+  {unit:'465', cls:'ICAR',year:2020,model:'ELANTRA',   body:'4DR',plate:'8YGT448', color:'SILVER',mileage:6850,  status:'avail',tb:'08/11/2021',inSvc:'04/30/2026'},
+  {unit:'466', cls:'ICAR',year:2019,model:'ELANTRA',   body:'4DR',plate:'8YGT448', color:'SILVER',mileage:4831,  status:'rent', tb:'09/09/2021',inSvc:'12/18/2024'},
+  {unit:'470', cls:'ICAR',year:2020,model:'ELANTRA',   body:'4DR',plate:'8AYT110', color:'GRAY',  mileage:39650, status:'rent', tb:'12/21/2021',inSvc:'01/08/2022'},
+  {unit:'473', cls:'ICAR',year:2019,model:'ELANTRA',   body:'4DR',plate:'8YGT449', color:'GRAY',  mileage:49859, status:'rent', tb:'01/29/2022',inSvc:'04/25/2026'},
+  {unit:'474', cls:'ICAR',year:2018,model:'ELANTRA',   body:'4DR',plate:'8YCT447', color:'BLACK', mileage:43918, status:'rent', tb:'02/09/2022',inSvc:'05/29/2022'},
+  {unit:'475', cls:'ICAR',year:2019,model:'ELANTRA',   body:'4DR',plate:'9AIJ293', color:'GRAY',  mileage:10875, status:'rent', tb:'01/22/2019',inSvc:'05/29/2022'},
+  {unit:'486', cls:'ICAR',year:2012,model:'ELANTRA',   body:'4DR',plate:'8RLE249', color:'GRAY',  mileage:10875, status:'rent', tb:'10/06/2022',inSvc:'04/30/2026'},
+  {unit:'506', cls:'ICAR',year:2013,model:'COROLLA',   body:'4DR',plate:'9PRK599', color:'WHITE', mileage:16638, status:'avail',tb:'04/04/2023',inSvc:'02/28/2026'},
+  {unit:'52',  cls:'ICAR',year:2009,model:'ELANTRA',   body:'4DR',plate:'6WR2550', color:'WHITE', mileage:14100, status:'avail',tb:'01/22/2019',inSvc:'02/08/2023'},
+  {unit:'558', cls:'ICAR',year:2010,model:'ELANTRA',   body:'4DR',plate:'8KEBL156',color:'GRAY',  mileage:9839,  status:'rent', tb:'01/02/2019',inSvc:'11/05/2025'},
+  {unit:'594', cls:'ICAR',year:2010,model:'ELANTRA',   body:'4DR',plate:'8DVC429', color:'SILVER',mileage:17580, status:'avail',tb:'01/22/2019',inSvc:'06/21/2023'},
+  {unit:'615', cls:'ICAR',year:2011,model:'A6',        body:'4DR',plate:'4MGA058', color:'SILVER',mileage:17881, status:'rent', tb:'02/29/2020',inSvc:'06/18/2023'},
+  {unit:'618', cls:'ICAR',year:2000,model:'A6',        body:'4DR',plate:'3WZ2179', color:'WHITE', mileage:23319, status:'avail',tb:'03/29/2019',inSvc:'10/14/2023'},
+  {unit:'704', cls:'ICAR',year:1997,model:'AVENGER',   body:'4DR',plate:'',        color:'',      mileage:0,     status:'avail',tb:'',          inSvc:''},
+  {unit:'773', cls:'ICAR',year:1991,model:'COROLLA',   body:'4DR',plate:'1WUV856', color:'GREY',  mileage:23319, status:'avail',tb:'',          inSvc:''},
+  {unit:'565', cls:'LCAR',year:2006,model:'S40',       body:'4DR',plate:'8YGTA57', color:'RED',   mileage:8138,  status:'avail',tb:'02/04/2022',inSvc:'04/30/2026'},
+  {unit:'415', cls:'MVAN',year:2004,model:'ASTRO VAN', body:'VAN', plate:'4S523E1', color:'WHITE', mileage:13856, status:'avail',tb:'04/08/2019',inSvc:'04/30/2026'},
+];
+
+const colorMap={
+  WHITE:'#e8e8e8',SILVER:'#b0b8c4',BLACK:'#2a2a2a',GREY:'#6b7280',GRAY:'#6b7280',
+  BLUE:'#3b82f6',RED:'#ef4444',GOLD:'#ca8a04',MAROON:'#9f1239',GREEN:'#16a34a',
+  TAN:'#c4a35a',BURGUNDY:'#7c2d3e'
+};
+const classMeta={
+  CCAR:{color:'#60a5fa'},ICAR:{color:'#a78bfa'},FCAR:{color:'#34d399'},
+  XFAR:{color:'#fb923c'},ECAR:{color:'#f472b6'},HBRD:{color:'#2dd4bf'},
+  LCAR:{color:'#f87171'},MVAN:{color:'#fde047'}
+};
+
+// ══════════════════════════════════════════
+// COMPUTE
+// ══════════════════════════════════════════
+const rentCount  = fleet.filter(r=>r.status==='rent').length;
+const availCount = fleet.filter(r=>r.status==='avail').length;
+const totalCount = fleet.length;
+const utilPct    = Math.round(rentCount/totalCount*100);
+
+document.getElementById('kpiRent').textContent  = rentCount;
+document.getElementById('kpiAvail').textContent = availCount;
+document.getElementById('gbRent').textContent   = rentCount;
+document.getElementById('gbAvail').textContent  = availCount;
+document.getElementById('gaugePct').textContent = utilPct+'%';
+
+// ── Gauge (half-donut) ────────────────────
+(function(){
+  const svg=document.getElementById('gaugeSvg');
+  const cx=110,cy=110,r=82,sw=20;
+  const circ=Math.PI*r;
+  const usedDash=utilPct/100*circ;
+
+  // Tick marks at 0%, 25%, 50%, 75%, 100%
+  const ticks=[0,25,50,75,100].map(p=>{
+    const a=Math.PI*p/100;
+    const innerR=r-sw/2-2;
+    const outerR=r+sw/2+2;
+    const ix=cx-innerR*Math.cos(a), iy=cy-innerR*Math.sin(a);
+    const ox=cx-outerR*Math.cos(a), oy=cy-outerR*Math.sin(a);
+    return `<line x1="${ix.toFixed(1)}" y1="${iy.toFixed(1)}" x2="${ox.toFixed(1)}" y2="${oy.toFixed(1)}" stroke="var(--bg)" stroke-width="2" stroke-linecap="round"/>`;
+  }).join('');
+
+  svg.innerHTML=`
+    <defs>
+      <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#4fd1c5"/>
+        <stop offset="100%" stop-color="#e8c547"/>
+      </linearGradient>
+      <filter id="gaugeGlow">
+        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+        <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <path d="M ${cx-r},${cy} A ${r},${r} 0 0,1 ${cx+r},${cy}" fill="none" stroke="var(--s3)" stroke-width="${sw}" stroke-linecap="round"/>
+    <path d="M ${cx-r},${cy} A ${r},${r} 0 0,1 ${cx+r},${cy}" fill="none" stroke="url(#gaugeGrad)" stroke-width="${sw}" stroke-linecap="round"
+      stroke-dasharray="${usedDash} ${circ}" filter="url(#gaugeGlow)"
+      style="transition:stroke-dasharray 1.6s cubic-bezier(.16,1,.3,1) 0.3s"/>
+    ${ticks}`;
+})();
+
+// ── Animated number counter ────────────────
+function countUp(el,target,opts={}){
+  const{prefix='',suffix='',decimals=0,duration=1400}=opts;
+  const start=performance.now();
+  const frame=now=>{
+    const t=Math.min((now-start)/duration,1);
+    const eased=1-Math.pow(1-t,3);
+    const val=target*eased;
+    const fmt=decimals>0?val.toFixed(decimals):Math.round(val).toLocaleString();
+    el.textContent=prefix+fmt+suffix;
+    if(t<1)requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+
+// ── Class bar chart ────────────────────────
+(function(){
+  const counts={};
+  fleet.forEach(r=>{counts[r.cls]=(counts[r.cls]||0)+1;});
+  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const max=sorted[0][1];
+  const el=document.getElementById('classBarChart');
+  el.innerHTML=sorted.map(([cls,cnt])=>{
+    const pct=(cnt/max*100).toFixed(1);
+    const color=(classMeta[cls]||{color:'#888'}).color;
+    return`<div class="hbar-row">
+      <div class="hbar-lbl">${cls}</div>
+      <div class="hbar-track">
+        <div class="hbar-fill" data-pct="${pct}" style="background:${color};width:0%">
+          <span class="hbar-fill-lbl">${((cnt/totalCount)*100).toFixed(0)}%</span>
+        </div>
+      </div>
+      <div class="hbar-cnt">${cnt}</div>
+    </div>`;
+  }).join('');
+  requestAnimationFrame(()=>{
+    setTimeout(()=>{
+      document.querySelectorAll('.hbar-fill').forEach(el=>el.style.width=el.dataset.pct+'%');
+    },150);
+  });
+})();
+
+// ── Revenue bars ───────────────────────────
+(function(){
+  const types=[
+    {label:'Mo.',  mo:9104,  color:'#e8c547'},
+    {label:'Wk.',  mo:5304,  color:'#4fd1c5'},
+    {label:'Day',  mo:8154,  color:'#f87171'},
+  ];
+  const maxMo=Math.max(...types.map(t=>t.mo));
+  const el=document.getElementById('revBars');
+  el.innerHTML=types.map(t=>{
+    const pct=(t.mo/maxMo*100).toFixed(1);
+    return`<div class="rev-row">
+      <div class="rev-lbl">${t.label}</div>
+      <div class="rev-track">
+        <div class="rev-fill" data-pct="${pct}" style="background:${t.color};width:0%">
+          <span class="rev-fill-lbl">$${t.mo.toLocaleString()}/mo</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  requestAnimationFrame(()=>{
+    setTimeout(()=>{
+      document.querySelectorAll('.rev-fill').forEach(el=>el.style.width=el.dataset.pct+'%');
+    },200);
+  });
+})();
+
+// ── Donut ──────────────────────────────────
+// BUG FIX: stroke-dashoffset was -(offset-circ*0.25) which double-rotated by 90°
+// alongside transform="rotate(-90)". Correct formula is just -offset.
+(function(){
+  const segs=[
+    {label:'Monthly',count:15,color:'#e8c547'},
+    {label:'Weekly', count:7, color:'#4fd1c5'},
+    {label:'Daily',  count:2, color:'#f87171'},
+  ];
+  const total=24,cx=70,cy=70,r=50,sw=18;
+  const circ=2*Math.PI*r;
+  const gapPx=5; // visual gap between segments
+  let offset=0;
+  let svgHTML='';
+  segs.forEach(s=>{
+    const fullSlice=(s.count/total)*circ;
+    const dash=Math.max(0,fullSlice-gapPx);
+    svgHTML+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+      stroke="${s.color}" stroke-width="${sw}"
+      stroke-dasharray="${dash} ${circ-dash}"
+      stroke-dashoffset="${-offset}"
+      transform="rotate(-90 ${cx} ${cy})"/>`;
+    offset+=fullSlice;
+  });
+  document.getElementById('donutSvg').innerHTML=
+    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--s3)" stroke-width="${sw}"/>`+svgHTML;
+
+  document.getElementById('donutLeg').innerHTML=segs.map(s=>`
+    <div class="dl-row">
+      <div class="dl-dot" style="background:${s.color}"></div>
+      <div class="dl-name">${s.label}</div>
+      <div class="dl-val">${s.count} contracts</div>
+    </div>`).join('');
+})();
+
+// ── Agent grid ─────────────────────────────
+(function(){
+  const agents={};
+  agreements.forEach(a=>{
+    if(!agents[a.agent])agents[a.agent]={contracts:0,monthly:0};
+    if(a.type!=='zero'){agents[a.agent].contracts++;agents[a.agent].monthly+=a.mo;}
+  });
+  document.getElementById('agentGrid').innerHTML=Object.entries(agents)
+    .sort((a,b)=>b[1].monthly-a[1].monthly)
+    .map(([name,d])=>`
+    <div class="agent-row">
+      <div class="agent-name">${name}</div>
+      <div class="agent-stats">
+        <div class="ast"><div class="ast-n">${d.contracts}</div><div class="ast-l">Contracts</div></div>
+        <div class="ast"><div class="ast-n">$${Math.round(d.monthly/1000)}k</div><div class="ast-l">Mo. Rev</div></div>
+      </div>
+    </div>`).join('');
+})();
+
+// ══════════════════════════════════════════
+// FLEET TABLE
+// ══════════════════════════════════════════
+let flSortKey=null,flSortDir=1;
+
+function flSort(key,e){
+  if(flSortKey===key)flSortDir*=-1;else{flSortKey=key;flSortDir=1;}
+  document.querySelectorAll('#tab-fleet th').forEach(t=>t.classList.remove('sorted'));
+  e.currentTarget.classList.add('sorted');
+  const arrow=e.currentTarget.querySelector('.sort-arrow');
+  if(arrow)arrow.textContent=flSortDir===1?'↑':'↓';
+  renderFleet();
+}
+
+function renderFleet(){
+  const search=document.getElementById('flSearch').value.toLowerCase();
+  const cls=document.getElementById('flClass').value;
+  const status=document.getElementById('flStatus').value;
+  const color=document.getElementById('flColor').value;
+
+  let rows=fleet.filter(r=>{
+    if(cls && r.cls!==cls) return false;
+    if(color && r.color.toUpperCase()!==color) return false;
+    if(status==='rent' && r.status!=='rent') return false;
+    if(status==='avail' && r.status!=='avail') return false;
+    if(search){
+      const agr=raByUnit[r.unit]||{};
+      const blob=[r.unit,r.model,r.plate,r.color,r.year,r.cls,agr.name||'',agr.ra||''].join(' ').toLowerCase();
+      if(!blob.includes(search)) return false;
+    }
+    return true;
+  });
+
+  if(flSortKey){
+    rows.sort((a,b)=>{
+      let av=a[flSortKey],bv=b[flSortKey];
+      if(flSortKey==='mileage'||flSortKey==='year'){av=Number(av)||0;bv=Number(bv)||0;}
+      else{av=String(av||'').toLowerCase();bv=String(bv||'').toLowerCase();}
+      return av<bv?-flSortDir:av>bv?flSortDir:0;
+    });
+  }
+
+  const tbody=document.getElementById('flBody');
+  const noRes=document.getElementById('flNoRes');
+  document.getElementById('flCount').textContent=`${rows.length} vehicle${rows.length===1?'':'s'}`;
+
+  if(!rows.length){tbody.innerHTML='';noRes.style.display='block';return;}
+  noRes.style.display='none';
+
+  const typeColor={mo:'rate-type-mo',wk:'rate-type-wk',day:'rate-type-day'};
+  const typeBadge={mo:'badge-mo',wk:'badge-wk',day:'badge-day',zero:'badge-zero'};
+
+  tbody.innerHTML=rows.map(r=>{
+    const agr=raByUnit[r.unit];
+    const isRent=r.status==='rent';
+    const dot=colorMap[r.color.toUpperCase()]||'#444';
+    const mi=r.mileage>0?Number(r.mileage).toLocaleString():'—';
+    const bc='b-'+(r.cls||'').toLowerCase();
+
+    let statusCell,renterCell,rateCell,typeCell;
+    if(isRent && agr){
+      // BUG FIX: removed emoji, replaced with animated pulse dot
+      statusCell=`<span class="status-rent"><span class="rent-pulse"></span>${agr.ra}</span>`;
+      renterCell=agr.name;
+      const fmtRate=agr.type==='day'?`$${agr.rate}/day`:agr.type==='wk'?`$${agr.rate}/wk`:`$${agr.rate}/mo`;
+      rateCell=`<span class="${typeColor[agr.type]||''}">${fmtRate}</span>`;
+      typeCell=`<span class="badge ${typeBadge[agr.type]||''}">${agr.type}</span>`;
+    } else if(isRent){
+      // BUG FIX: was incorrectly showing "Available" for rent units with no agreement
+      statusCell=`<span class="status-rent-unknown"><span class="rent-pulse" style="background:var(--muted)"></span> On Rent</span>`;
+      renterCell=`<span style="color:var(--muted2)">—</span>`;
+      rateCell=`<span style="color:var(--muted2)">—</span>`;
+      typeCell=`<span style="color:var(--muted2)">—</span>`;
+    } else {
+      statusCell=`<span class="status-avail">✔ Available</span>`;
+      renterCell=`<span style="color:var(--muted2)">—</span>`;
+      rateCell=`<span style="color:var(--muted2)">—</span>`;
+      typeCell=`<span style="color:var(--muted2)">—</span>`;
+    }
+
+    return`<tr class="${isRent?'on-rent':''}">
+      <td class="unit-cell">${r.unit}</td>
+      <td><span class="badge ${bc}">${r.cls}</span></td>
+      <td>${r.year||'—'}</td>
+      <td>${r.model||'—'}</td>
+      <td>${r.body||'—'}</td>
+      <td class="pl">${r.plate||'—'}</td>
+      <td><span class="cdot" style="background:${dot}"></span>${r.color||'—'}</td>
+      <td class="mi">${mi}</td>
+      <td>${statusCell}</td>
+      <td style="font-size:11px">${renterCell}</td>
+      <td>${rateCell}</td>
+      <td>${typeCell}</td>
+      <td style="font-size:10px;color:var(--muted)">${r.tb||'—'}</td>
+      <td style="font-size:10px;color:var(--muted)">${r.inSvc||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('flSearch').addEventListener('input',renderFleet);
+document.getElementById('flClass').addEventListener('change',renderFleet);
+document.getElementById('flStatus').addEventListener('change',renderFleet);
+document.getElementById('flColor').addEventListener('change',renderFleet);
+renderFleet();
+
+// ══════════════════════════════════════════
+// AGREEMENTS TABLE
+// ══════════════════════════════════════════
+(function(){
+  const typeBadge={mo:'badge-mo',wk:'badge-wk',day:'badge-day',zero:'badge-zero'};
+  const typeLabel={mo:'mo',wk:'wk',day:'day',zero:'$0'};
+  document.getElementById('agrBody').innerHTML=agreements.map(a=>`
+    <tr>
+      <td class="ra-n">${a.ra}</td>
+      <td class="nm">${a.name}</td>
+      <td><span class="badge b-${(a.cls||'').toLowerCase()}">${a.cls}</span></td>
+      <td style="font-family:'Syne',sans-serif;font-weight:800;color:var(--gold)">${a.unit}</td>
+      <td style="font-size:11px;color:var(--muted)">${a.agent}</td>
+      <td><span class="badge ${typeBadge[a.type]||''}">${typeLabel[a.type]||a.type}</span></td>
+      <td class="r rate-v ${a.rate===0?'zero':''}">${a.rate===0?'$0.00':'$'+a.rate.toFixed(2)}</td>
+      <td class="r wk-eq">${a.wk===0?'—':'$'+a.wk.toFixed(2)}</td>
+      <td class="r mo-eq">${a.mo===0?'—':'$'+a.mo.toFixed(2)}</td>
+    </tr>`).join('');
+})();
+
+// ══════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════
+function showTab(id,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='overview'){
+    setTimeout(()=>{
+      document.querySelectorAll('.hbar-fill').forEach(el=>el.style.width=el.dataset.pct+'%');
+      document.querySelectorAll('.rev-fill').forEach(el=>el.style.width=el.dataset.pct+'%');
+    },50);
+  }
+}
+</script>
+</body>
+</html>
