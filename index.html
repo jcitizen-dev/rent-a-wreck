@@ -373,6 +373,8 @@ body::before{
 /* ─── FLEET TABLE ─── */
 #tab-fleet{
   height:calc(100vh - 56px);
+}
+#tab-fleet.active{
   display:flex;flex-direction:column;
 }
 
@@ -641,7 +643,7 @@ td.unit-cell{
   <div class="ov-hero">
     <div>
       <div class="ov-headline">Fleet<em>Operations</em></div>
-      <div class="ov-sub">107 units &nbsp;·&nbsp; 25 open agreements</div>
+      <div class="ov-sub" id="ovSub">— units &nbsp;·&nbsp; 25 open agreements</div>
 
       <div class="rev-highlight">
         <div class="rh-main">
@@ -684,7 +686,7 @@ td.unit-cell{
           <div class="gb-lbl">Available</div>
         </div>
         <div class="gb-item">
-          <div class="gb-num" style="color:var(--gold)" id="gbTotal">107</div>
+          <div class="gb-num" style="color:var(--gold)" id="gbTotal">—</div>
           <div class="gb-lbl">Total</div>
         </div>
       </div>
@@ -694,7 +696,7 @@ td.unit-cell{
   <!-- KPIs -->
   <div class="kpi-grid">
     <div class="kpi" style="--kc:var(--gold)">
-      <div class="kpi-n">107</div>
+      <div class="kpi-n" id="kpiTotal">—</div>
       <div class="kpi-l">Total Fleet</div>
       <div class="kpi-s">7 classes</div>
     </div>
@@ -734,9 +736,9 @@ td.unit-cell{
     </div>
 
     <div class="chart-card">
-      <div class="cc-title">Revenue by Contract Type</div>
+      <div class="cc-title">Monthly Revenue by Rate Type</div>
       <div>
-        <div style="font-size:10px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;">Monthly equivalent</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;">All types converted to $/month</div>
         <div class="rev-bars" id="revBars"></div>
       </div>
     </div>
@@ -1066,11 +1068,14 @@ const availCount = fleet.filter(r=>r.status==='avail').length;
 const totalCount = fleet.length;
 const utilPct    = Math.round(rentCount/totalCount*100);
 
+document.getElementById('kpiTotal').textContent = totalCount;
 document.getElementById('kpiRent').textContent  = rentCount;
 document.getElementById('kpiAvail').textContent = availCount;
+document.getElementById('gbTotal').textContent  = totalCount;
 document.getElementById('gbRent').textContent   = rentCount;
 document.getElementById('gbAvail').textContent  = availCount;
 document.getElementById('gaugePct').textContent = utilPct+'%';
+document.getElementById('ovSub').innerHTML      = `${totalCount} units &nbsp;·&nbsp; 25 open agreements`;
 
 // ── Gauge ─────────────────────────────────
 (function(){
